@@ -31,7 +31,7 @@ const ROWS: Row[] = [
   { key: 'delWallet', label: 'Delivery share in primary wallet', fmt: money },
   { key: 'pfWallet', label: 'Platform fee share in primary wallet', fmt: money },
   { sec: 'Deduction 2 – Razorpay route split (0.25% + 18% GST)' },
-  { key: 'splitFee', label: 'Razorpay split fee', fmt: money },
+  { key: 'splitFee', label: 'Razorpay split fee (on restaurant transfer)', fmt: money },
   { key: 'target', label: 'Amount to be transferred to restaurant wallet', fmt: money },
   { key: 'actual', label: 'Amount transferred to restaurant wallet', fmt: money, tone: 'good' },
   { key: 'delFinal', label: 'Final amount in delivery wallet (no route transfer)', fmt: money },

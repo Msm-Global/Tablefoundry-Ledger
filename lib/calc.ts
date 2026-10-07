@@ -50,8 +50,9 @@ export function computeAll(cases: Case[], opening: LedgerState['opening']): Resu
     const restPost = yes ? Math.max(0, restPre - net) : restPre;
     const delWallet = pw * ds;
     const pfWallet = pw * pfs;
-    const splitFee = pw - pw / SPLIT_K;
     const target = restPost / SPLIT_K;
+    // Route split fee applies only to the amount routed to the restaurant (the delivery share is not route-transferred).
+    const splitFee = restPost - target;
     const actual = yes ? target : 0;
     const refund = yes ? 0 : tov;
     const restOwes = yes ? Math.max(0, net - restPre) : restF ? refund - target + net : net;
