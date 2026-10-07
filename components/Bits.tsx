@@ -57,3 +57,9 @@ export function NumInput({ value, onChange }: { value: number; onChange: (n: num
     />
   );
 }
+
+export function LogoutButton() {
+  return (
+    <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; }}>Sign out</button>
+  );
+}

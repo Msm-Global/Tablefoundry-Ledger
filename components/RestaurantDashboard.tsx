@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { computeAll, money, restaurantRows } from '@/lib/calc';
 import { normalizeCode, useGuest } from '@/lib/pairing';
 import { LineChart, PairedBars } from './Charts';
-import { StatusChip, ThemeToggle } from './Bits';
+import { StatusChip, ThemeToggle, LogoutButton } from './Bits';
 
 const KEY = 'restaurant-pair-code';
 
@@ -90,6 +90,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
           <button onClick={downloadCsv} disabled={!rows.length}>Download CSV</button>
           <button onClick={onUnpair}>Change code</button>
           <ThemeToggle />
+          <LogoutButton />
         </div>
       </header>
 

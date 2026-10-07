@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { BLANK, Case, LedgerState, OUTCOMES, Outcome, Result, computeAll, money, pct } from '@/lib/calc';
 import { useHost } from '@/lib/pairing';
 import { LineChart, StackedShareChart } from './Charts';
-import { CopyButton, NumInput, StatusChip, ThemeToggle } from './Bits';
+import { CopyButton, NumInput, StatusChip, ThemeToggle, LogoutButton } from './Bits';
 
 const STORE = 'tf-ledger-state-v1';
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -122,6 +122,7 @@ export default function TFDashboard() {
           <button onClick={downloadCsv} disabled={!state.cases.length}>Download CSV</button>
           <button className="danger" onClick={() => { if (confirm('Delete all cases?')) setState(s => ({ ...s, cases: [] })); }}>Clear all</button>
           <ThemeToggle />
+          <LogoutButton />
         </div>
       </header>
 
