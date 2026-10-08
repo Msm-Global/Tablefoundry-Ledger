@@ -1,4 +1,5 @@
 // ---------- types ----------
+import type { AccountDetails } from './account';
 export type Outcome = 'YES' | 'RESTAURANT' | 'LOGISTICS' | 'TF';
 export type Provider = 'UENGAGE' | 'PROROUTING';
 export const PROVIDERS: [Provider, string][] = [['UENGAGE', 'uEngage'], ['PROROUTING', 'Pro Routing']];
@@ -36,9 +37,12 @@ export interface Settlement {
   id: string;
   restaurantKey: string;
   restaurant: string;
-  amount: number;      // net amount paid to the restaurant
-  offset: number;      // restaurant-owes-TF netted off in this settlement
+  amount: number;      // whole rupees actually paid to the restaurant (rounded TF-owes minus rounded restaurant-owes)
+  clearTf: number;     // exact "TF owes restaurant" balance cleared by this settlement
+  clearRest: number;   // exact "restaurant owes TF" balance cleared by this settlement
   utr: string;
+  paidAt: number;      // date & time of the payment, entered by TF ops
+  account?: AccountDetails; // restaurant account the payment went to (snapshot)
   method: PayMethod;
   status: SettlementStatus;
   createdAt: number; createdBy: string;
@@ -53,9 +57,9 @@ export interface WalletEntry {
   amount: number; // signed
 }
 export interface AuditEntry { id: string; ts: number; by: string; text: string }
-export interface TFState { orders: Order[]; wallet: WalletEntry[]; audit: AuditEntry[]; settlements: Settlement[] }
+export interface TFState { orders: Order[]; wallet: WalletEntry[]; audit: AuditEntry[]; settlements: Settlement[]; accounts: Record<string, AccountDetails> }
 export interface PublicState { orders: Order[]; settlements: Settlement[] }
-export const BLANK: TFState = { orders: [], wallet: [], audit: [], settlements: [] };
+export const BLANK: TFState = { orders: [], wallet: [], audit: [], settlements: [], accounts: {} };
 
 export const OUTCOMES: [Outcome, string][] = [
   ['YES', 'Fulfilled'],
@@ -136,8 +140,8 @@ export function computeAll(orders: Order[], settlements: Settlement[] = []): Res
     let restOwesF = restOwes, tfOwesF = tfOwes;
     for (const st of settlements) {
       if (st.status === 'settled' && st.anchorOrderId === c.id) {
-        tfOwesF = Math.max(0, tfOwesF - (st.amount + st.offset));
-        restOwesF = Math.max(0, restOwesF - st.offset);
+        tfOwesF = Math.max(0, tfOwesF - st.clearTf);
+        restOwesF = Math.max(0, restOwesF - st.clearRest);
       }
     }
     chain.set(key, { rest: restOwesF, tf: tfOwesF });
@@ -220,7 +224,10 @@ export function inr(n: number) {
   return (n < 0 && n > -0.005 ? 0 : n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 export const money = (n: number) => (n < -0.005 ? '−₹' + inr(-n) : '₹' + inr(n));
+/** Settlement payments are whole rupees. */
+export const moneyR = (n: number) => '₹' + Math.round(n).toLocaleString('en-IN');
 export const pct = (n: number) => (n * 100).toFixed(2) + '%';
+export const fmtDateTime = (ts: number) => new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 export const fmtTime = (ts: number) => new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** What the restaurant dashboard receives: no wallet, no audit trail, no operator identities. */

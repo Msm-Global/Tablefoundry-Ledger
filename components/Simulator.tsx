@@ -65,7 +65,7 @@ export default function Simulator() {
   });
   const dup = (i: number) => setState(s => { const c = s.orders[i]; const cs = [...s.orders]; cs.splice(i + 1, 0, { ...c, id: newOrderId(), name: c.name + ' copy', refund: undefined, createdAt: Date.now() }); return { ...s, orders: cs }; });
   const del = (i: number) => setState(s => ({ ...s, orders: s.orders.filter((_, j) => j !== i) }));
-  const reset = () => { if (confirm('Delete ALL orders, the refund wallet ledger and the activity log?')) setState({ orders: [], wallet: [], audit: [], settlements: [] }); };
+  const reset = () => { if (confirm('Delete ALL orders, the refund wallet ledger and the activity log?')) setState({ orders: [], wallet: [], audit: [], settlements: [], accounts: {} }); };
 
   const downloadCsv = () => {
     const q = (v: unknown) => '"' + String(v).replace(/"/g, '""') + '"';

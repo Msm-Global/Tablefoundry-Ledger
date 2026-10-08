@@ -5,6 +5,8 @@ import { normalizeCode, useGuest } from '@/lib/pairing';
 import { LineChart, PairedBars } from './Charts';
 import { StatusChip, ThemeToggle, LogoutButton } from './Bits';
 import RestSettlement from './RestSettlement';
+import AccountModal from './AccountModal';
+import { AccountDetails, hasAnyDetails, loadAccount, loadAllAccounts, saveAccount } from '@/lib/account';
 import { isOpen } from '@/lib/settlement';
 
 const KEY = 'restaurant-pair-code';
@@ -48,6 +50,8 @@ export default function RestaurantDashboard() {
 function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
   const { state, status, message, send } = useGuest(code);
   const [settleOpen, setSettleOpen] = useState(false);
+  const [acctOpen, setAcctOpen] = useState(false);
+  const [accts, setAccts] = useState<Record<string, AccountDetails>>({});
   const [sel, setSel] = useState('');
   useEffect(() => { try { setSel(sessionStorage.getItem('restaurant-sel') || ''); } catch {} }, []);
 
@@ -61,6 +65,18 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
   const current = restaurants.find(r => r.key === sel)?.key ?? restaurants[0]?.key ?? '';
   const pick = (k: string) => { setSel(k); try { sessionStorage.setItem('restaurant-sel', k); } catch {} };
   const rows = useMemo(() => allRows.filter(r => r.key === current), [allRows, current]);
+  useEffect(() => { setAccts(loadAllAccounts(code)); }, [code]);
+  const account = accts[current] ?? (current ? loadAccount(code, current) : undefined);
+  const saveAcct = (d: AccountDetails | null) => {
+    saveAccount(code, current, d);
+    setAccts(a => { const n = { ...a }; if (d) n[current] = d; else delete n[current]; return n; });
+    send({ kind: 'account', key: current, details: d });
+  };
+  // Re-send every saved account to TF whenever the connection (re)opens.
+  useEffect(() => {
+    if (status !== 'connected') return;
+    Object.entries(loadAllAccounts(code)).forEach(([k, d]) => send({ kind: 'account', key: k, details: d }));
+  }, [status, code]); // eslint-disable-line react-hooks/exhaustive-deps
   const resFor = useMemo(() => (state ? results.filter((_, i) => allRows[i].key === current) : []), [state, results, allRows, current]);
 
   const sum = (k: 'gateway' | 'splitFee' | 'recovered' | 'payout' | 'held' | 'raised' | 'food') => rows.reduce((a, r) => a + r[k], 0);
@@ -106,6 +122,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
         <div className="btns">
           <StatusChip status={status} />
           <span className="chip">Code {code}</span>
+          <button onClick={() => setAcctOpen(true)} disabled={!current}>Account details{current && !hasAnyDetails(account) ? ' ⚠' : ''}</button>
           <button onClick={downloadCsv} disabled={!rows.length}>Download CSV</button>
           <button onClick={onUnpair}>Change code</button>
           <ThemeToggle />
@@ -130,7 +147,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
           </div>
           <div className="kpis">
             {kpis.map(([l, v, c, k]) => k === 'settle'
-              ? <button key={l} className={`kpi click ${c || ''}`} onClick={() => setSettleOpen(true)}><div className="l">{l}</div><div className="v">{v}</div><div className="sub" style={needsAction ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{needsAction ? 'Settlement awaiting your verification' : mySettlements.some(isOpen) ? 'Settlement in progress' : 'Click for settlement'}</div></button>
+              ? <button key={l} className={`kpi click ${c || ''}`} onClick={() => setSettleOpen(true)}><div className="l">{l}</div><div className="v">{v}</div><div className="sub" style={needsAction ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{!hasAnyDetails(account) && current ? 'No account details added' : needsAction ? 'Settlement awaiting your verification' : mySettlements.some(isOpen) ? 'Settlement in progress' : 'Click for settlement'}</div></button>
               : <div key={l} className={`kpi ${c || ''}`}><div className="l">{l}</div><div className="v">{v}</div></div>)}
           </div>
           {rows.length > 0 && (
@@ -194,7 +211,8 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
               </table>
             )}
           </div>
-          {settleOpen && <RestSettlement name={restaurants.find(r => r.key === current)?.name ?? ''} settlements={mySettlements} tfOwes={tfOwes} restOwes={owes} send={send} connected={status === 'connected'} onClose={() => setSettleOpen(false)} />}
+          {settleOpen && <RestSettlement name={restaurants.find(r => r.key === current)?.name ?? ''} settlements={mySettlements} tfOwes={tfOwes} restOwes={owes} send={send} connected={status === 'connected'} account={account} onAddAccount={() => { setSettleOpen(false); setAcctOpen(true); }} onClose={() => setSettleOpen(false)} />}
+          {acctOpen && <AccountModal name={restaurants.find(r => r.key === current)?.name ?? ''} initial={account} onSave={saveAcct} onClose={() => setAcctOpen(false)} />}
           <div className="note">Gateway fee is 2% + 18% GST (2.36%) on the order, borne in proportion to food value. Route split fee is 0.25% + 18% GST on the amount transferred to you. If you owe TF, it is recovered from your next fulfilled order&apos;s payout (net of anything TF owes you). Cancelled orders change your balances only after TF processes the refund.</div>
         </>
       )}
