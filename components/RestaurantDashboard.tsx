@@ -45,21 +45,34 @@ export default function RestaurantDashboard() {
 
 function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
   const { state, status, message } = useGuest(code);
-  const results = useMemo(() => (state ? computeAll(state.cases, state.opening) : []), [state]);
-  const rows = useMemo(() => (state ? restaurantRows(state, results) : []), [state, results]);
+  const [sel, setSel] = useState('');
+  useEffect(() => { try { setSel(sessionStorage.getItem('restaurant-sel') || ''); } catch {} }, []);
+
+  const results = useMemo(() => (state ? computeAll(state.orders) : []), [state]);
+  const allRows = useMemo(() => (state ? restaurantRows(state.orders, results) : []), [state, results]);
+  const restaurants = useMemo(() => {
+    const m = new Map<string, string>();
+    allRows.forEach(r => m.set(r.key, r.restaurant));
+    return [...m.entries()].map(([key, name]) => ({ key, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allRows]);
+  const current = restaurants.find(r => r.key === sel)?.key ?? restaurants[0]?.key ?? '';
+  const pick = (k: string) => { setSel(k); try { sessionStorage.setItem('restaurant-sel', k); } catch {} };
+  const rows = useMemo(() => allRows.filter(r => r.key === current), [allRows, current]);
+  const resFor = useMemo(() => (state ? results.filter((_, i) => allRows[i].key === current) : []), [state, results, allRows, current]);
 
   const sum = (k: 'gateway' | 'splitFee' | 'recovered' | 'payout' | 'held' | 'raised' | 'food') => rows.reduce((a, r) => a + r[k], 0);
   const last = rows[rows.length - 1];
-  const owes = last?.owes ?? (state?.opening.rest || 0);
-  const tfOwes = last?.tfOwes ?? (state?.opening.tf || 0);
+  const owes = last?.owes ?? 0;
+  const tfOwes = last?.tfOwes ?? 0;
   const net = tfOwes - owes;
   const paid = rows.filter(r => r.cls === 'ok').length;
+  const refundPending = rows.filter(r => r.refundLabel === 'Refund pending').length;
   const names = rows.map(r => r.name);
 
   const downloadCsv = () => {
     const q = (v: unknown) => '"' + String(v).replace(/"/g, '""') + '"';
-    const head = ['Order', 'Outcome', 'Food value', 'Gateway fee', 'Dues recovered', 'Route split fee', 'Payout received', 'Held by TF', 'Added to dues', 'You owe TF', 'TF owes you', 'Note'];
-    const lines = [head.map(q).join(','), ...rows.map(r => [r.name, r.status, r.food, r.gateway, r.recovered, r.splitFee, r.payout, r.held, r.raised, r.owes, r.tfOwes, r.note].map(q).join(','))];
+    const head = ['Order', 'Outcome', 'Refund', 'Food value', 'Gateway fee', 'Dues recovered', 'Route split fee', 'Payout received', 'Held by TF', 'Added to dues', 'You owe TF', 'TF owes you', 'Note'];
+    const lines = [head.map(q).join(','), ...rows.map(r => [r.name, r.status, r.refundLabel, r.food, r.gateway, r.recovered, r.splitFee, r.payout, r.held, r.raised, r.owes, r.tfOwes, r.note].map(q).join(','))];
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
     a.download = 'restaurant-ledger.csv'; a.click();
@@ -67,10 +80,11 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
 
   const kpis: [string, React.ReactNode, string?][] = [
     ['Orders', <>{rows.length} <span className="sub">({paid} paid, {rows.length - paid} cancelled)</span></>],
-    ['Food value (fulfilled)', money(results.filter(r => r.fulfilled === 'YES').reduce((a, r) => a + r.fc, 0))],
+    ['Food value (fulfilled)', money(resFor.filter(r => r.fulfilled === 'YES').reduce((a, r) => a + r.fc, 0))],
     ['Payouts received', money(sum('payout')), 'good'],
     ['Gateway + split fees', money(sum('gateway') + sum('splitFee'))],
     ['Dues recovered by TF', money(sum('recovered'))],
+    ['Refunds pending', String(refundPending), refundPending ? 'bad' : ''],
     ['You owe TF', money(owes), owes > 0.005 ? 'bad' : ''],
     ['TF owes you', money(tfOwes), tfOwes > 0.005 ? 'good' : ''],
     ['Net position', (net >= 0 ? '+' : '−') + money(Math.abs(net)), net > 0.005 ? 'good' : net < -0.005 ? 'bad' : ''],
@@ -101,6 +115,14 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
         <div className="card empty">{status === 'error' ? 'Unable to connect.' : 'Connecting to the TF Owner dashboard…'}</div>
       ) : (
         <>
+          <div className="filters">
+            <label className="sub">Restaurant&nbsp;
+              <select value={current} onChange={e => pick(e.target.value)} disabled={!restaurants.length}>
+                {restaurants.length === 0 && <option>No restaurants yet</option>}
+                {restaurants.map(r => <option key={r.key} value={r.key}>{r.name}</option>)}
+              </select>
+            </label>
+          </div>
           <div className="kpis">
             {kpis.map(([l, v, c]) => <div key={l} className={`kpi ${c || ''}`}><div className="l">{l}</div><div className="v">{v}</div></div>)}
           </div>
@@ -132,16 +154,17 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
             </div>
           )}
           <div className="tablewrap">
-            {rows.length === 0 ? <div className="empty">No orders yet. Cases added on the TF Owner dashboard will appear here instantly.</div> : (
+            {rows.length === 0 ? <div className="empty">No orders yet for this restaurant. Orders added on the TF Owner dashboard will appear here instantly.</div> : (
               <table>
                 <thead><tr>
-                  {['Order', 'Outcome', 'Food value', 'Gateway fee', 'Dues recovered', 'Route split fee', 'Payout received', 'Held by TF for you', 'Added to your dues', 'You owe TF', 'TF owes you', 'What happened'].map((h, i) => <th key={h} style={i === 11 ? { textAlign: 'left' } : undefined}>{h}</th>)}
+                  {['Order', 'Outcome', 'Refund', 'Food value', 'Gateway fee', 'Dues recovered', 'Route split fee', 'Payout received', 'Held by TF for you', 'Added to your dues', 'You owe TF', 'TF owes you', 'What happened'].map((h, i, a) => <th key={h} style={i === a.length - 1 ? { textAlign: 'left' } : undefined}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {rows.map((r, i) => (
                     <tr key={i}>
                       <th className="rowh">{r.name}</th>
                       <td className="n"><span className={`pill ${r.cls}`}>{r.status}</span></td>
+                      <td className="n">{r.refundLabel === '—' ? <span className="zero">—</span> : <span className={`pill ${r.refundLabel === 'Refunded' ? 'ok' : 'hold'}`}>{r.refundLabel}</span>}</td>
                       <td className="n">{money(r.food)}</td>
                       <td className={'n' + z(r.gateway)}>{money(r.gateway)}</td>
                       <td className={'n' + z(r.recovered)}>{money(r.recovered)}</td>
@@ -156,7 +179,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
                   ))}
                 </tbody>
                 <tfoot><tr>
-                  <th className="rowh">Total</th><td />
+                  <th className="rowh">Total</th><td /><td />
                   <td className="n">{money(sum('food'))}</td><td className="n">{money(sum('gateway'))}</td><td className="n">{money(sum('recovered'))}</td>
                   <td className="n">{money(sum('splitFee'))}</td><td className="n">{money(sum('payout'))}</td><td className="n">{money(sum('held'))}</td>
                   <td className="n">{money(sum('raised'))}</td><td className="n">{money(owes)}</td><td className="n">{money(tfOwes)}</td><td />
@@ -164,7 +187,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
               </table>
             )}
           </div>
-          <div className="note">Gateway fee is 2% + 18% GST (2.36%) on the order, borne in proportion to food value. Route split fee is 0.25% + 18% GST on the amount transferred to you. If you owe TF, it is recovered from your next fulfilled order&apos;s payout (net of anything TF owes you).</div>
+          <div className="note">Gateway fee is 2% + 18% GST (2.36%) on the order, borne in proportion to food value. Route split fee is 0.25% + 18% GST on the amount transferred to you. If you owe TF, it is recovered from your next fulfilled order&apos;s payout (net of anything TF owes you). Cancelled orders change your balances only after TF processes the refund.</div>
         </>
       )}
     </div>

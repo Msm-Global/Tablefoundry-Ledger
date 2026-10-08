@@ -102,3 +102,41 @@ a{color:var(--accent)}
 .cards a:hover{border-color:var(--accent)}
 .cards b{display:block;font-size:16px;margin-bottom:4px}
 .cards span{color:var(--muted);font-size:13px}
+
+/* ---- tabs, widgets, drawer, modal ---- */
+.tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+.tabs a{padding:8px 16px;text-decoration:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+.tabs a.on{color:var(--text);border-bottom-color:var(--accent)}
+.widgets{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px}
+.widget{text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;display:block;width:100%}
+.widget:hover{border-color:var(--accent);background:var(--surface)}
+.widget .l{font-size:12px;color:var(--muted)}
+.widget .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;margin:2px 0}
+.widget .s{font-size:12px;color:var(--muted)}
+.widget.bad .v{color:var(--bad)} .widget.good .v{color:var(--good)} .widget.warn .v{color:var(--warn)}
+.widget.static{cursor:default}.widget.static:hover{border-color:var(--border)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(780px,100vw);background:var(--bg);border-left:1px solid var(--border);z-index:51;overflow:auto;padding:18px 18px 40px}
+.drawer h2{margin:0 0 4px;font-size:18px}
+.drawer .x{position:absolute;top:14px;right:14px}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;z-index:61}
+.scrim.m{z-index:60}
+.modal h2{margin:0 0 4px;font-size:18px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;font-size:13px;margin:10px 0}
+.kv span:nth-child(odd){color:var(--muted)}
+table.list{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:13px;margin:8px 0 16px}
+table.list th,table.list td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:normal;position:static;min-width:0;background:transparent;font-weight:400}
+table.list th{background:var(--surface2);font-size:12px;color:var(--muted)}
+table.list td.r,table.list th.r{text-align:right;font-variant-numeric:tabular-nums}
+.impact td.r.chg{font-weight:700}
+.impact .arrow{color:var(--muted);padding:0 4px}
+.form{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin:8px 0 12px}
+.form label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+.form input[type=text],.form input[type=number]{min-width:140px}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+button:disabled{opacity:.45;cursor:not-allowed}
+.hint{font-size:12px;color:var(--muted);margin:4px 0}
+.warnbox{border:1px solid var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin:8px 0}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:var(--surface2)}
+.badge.pending{color:var(--warn)}.badge.refunded{color:var(--accent)}.badge.reversed{color:var(--good)}.badge.na{color:var(--muted)}

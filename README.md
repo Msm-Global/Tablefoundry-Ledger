@@ -1,20 +1,16 @@
 # Tablefoundry Settlement Ledger
 
-Two paired dashboards (Next.js):
+Next.js app with paired dashboards (login required).
 
-- `/tf` – TF Owner dashboard. Enter test cases here. Shows a 6-character pairing code.
-- `/restaurant` – Restaurant dashboard (read-only). Enter the pairing code to see the same data live.
+- `/tf` – **TF Owner · Operations** (production-style screen): wallets, refund requests, owes lists, refund & transfer-reversal modals.
+- `/tf/simulator` – **Order simulator**: create fake orders (restaurant, delivery partner uEngage / Pro Routing, amounts, outcome, reason, issue note).
+- `/restaurant` – Restaurant dashboard (read-only). Enter the 6-character pairing code shown on the TF screens; pick a restaurant from the selector.
 
-The dashboards talk directly to each other (WebRTC). The free public PeerJS broker is only used to introduce them; no server of your own is needed and nothing is stored on a server.
+TF and restaurant dashboards talk directly (WebRTC via the free public PeerJS broker). All data is kept in the TF browser (localStorage). No backend, no real Razorpay calls: refund and reversal IDs are simulated (`rfnd_SIM…`, `rvrs_SIM…`) unless pasted in manually.
 
 ## Run locally
     npm install
-    npm run dev        # http://localhost:3000
+    npm run dev
 
-## Host it (Vercel, free)
-1. Push this folder to a GitHub repo (set the project's root directory to `tablefoundry-ledger` if it is inside a larger repo).
-2. vercel.com → Add New → Project → import the repo → Deploy. No settings or environment variables needed.
-3. Send the tester the URL. Tester opens `/tf` on one device and `/restaurant` on another.
-   The "Copy restaurant link" button on the TF page produces a link with the code already filled in.
-
-Or from the terminal: `npx vercel --prod`.
+## Login
+Set `AUTH_USERS` and `AUTH_SECRET` (see `scripts/hash-password.mjs`) in `.env.local` locally and in Vercel project settings.

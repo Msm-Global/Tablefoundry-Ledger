@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import type { LedgerState } from './calc';
+import type { PublicState } from './calc';
 
 export type Link = 'starting' | 'waiting' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
@@ -10,10 +10,10 @@ export const newCode = () => Array.from({ length: 6 }, () => ALPHABET[Math.floor
 export const normalizeCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
 const peerId = (code: string) => `tfledger-${code}`;
 
-type Msg = { type: 'state'; state: LedgerState } | { type: 'ping' };
+type Msg = { type: 'state'; state: PublicState } | { type: 'ping' };
 
 /** TF owner side: registers a peer under the pairing code and pushes state to every paired restaurant dashboard. */
-export function useHost(state: LedgerState) {
+export function useHost(state: PublicState) {
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<Link>('starting');
   const [guests, setGuests] = useState(0);
@@ -85,7 +85,7 @@ export function useHost(state: LedgerState) {
 
 /** Restaurant side: connects to the TF dashboard by pairing code and mirrors its state; retries automatically. */
 export function useGuest(code: string | null) {
-  const [state, setState] = useState<LedgerState | null>(null);
+  const [state, setState] = useState<PublicState | null>(null);
   const [status, setStatus] = useState<Link>('starting');
   const [message, setMessage] = useState('');
 

@@ -44,13 +44,13 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 /** Number input that lets you clear and retype freely, committing a number on every keystroke. */
-export function NumInput({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+export function NumInput({ value, onChange, disabled, max }: { value: number; onChange: (n: number) => void; disabled?: boolean; max?: number }) {
   const [txt, setTxt] = useState(String(value));
   const focused = useRef(false);
   useEffect(() => { if (!focused.current) setTxt(String(value)); }, [value]);
   return (
     <input
-      type="number" step="any" min="0" inputMode="decimal" value={txt}
+      type="number" step="any" min="0" max={max} inputMode="decimal" value={txt} disabled={disabled}
       onFocus={() => { focused.current = true; }}
       onBlur={() => { focused.current = false; setTxt(String(value)); }}
       onChange={e => { setTxt(e.target.value); onChange(e.target.value === '' ? 0 : Math.max(0, +e.target.value)); }}
