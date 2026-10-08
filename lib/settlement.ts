@@ -22,7 +22,7 @@ export const canRegenerate = (x: Settlement, now: number) => x.status === 'otp' 
 /** Orders that can no longer be edited/deleted because a refund or a verified settlement depends on them. */
 export function lockedOrderIds(s: TFState): Set<string> {
   const ids = new Set<string>();
-  s.orders.forEach(o => { if (o.refund) ids.add(o.id); });
+  s.orders.forEach(o => { if (o.refund || (o.logReceipts?.length ?? 0) > 0) ids.add(o.id); });
   s.settlements.filter(x => x.status === 'settled').forEach(x => {
     const anchor = s.orders.findIndex(o => o.id === x.anchorOrderId);
     s.orders.forEach((o, i) => { if (rkey(o.restaurant) === x.restaurantKey && i <= anchor) ids.add(o.id); });

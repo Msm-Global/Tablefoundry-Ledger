@@ -15,6 +15,13 @@ export interface Refund {
   creditsDeducted: number; // taken from Razorpay refund credits
   reversal?: Reversal;     // transfer reversed from the restaurant back to the primary wallet
 }
+export interface TaskInfo {
+  taskId: string; riderName: string; riderPhone: string;
+  pickupAddress: string; pickupPhone: string;                       // pickup name is the restaurant
+  customerName: string; customerPhone: string; dropAddress: string;
+}
+/** Money received from the delivery partner against a failed order (the same UTR may repeat across orders). */
+export interface LogReceipt { id: string; amount: number; utr: string; method: PayMethod; paidAt: number; at: number; by: string }
 export interface Order {
   id: string;
   name: string;
@@ -28,6 +35,8 @@ export interface Order {
   issue: string;
   createdAt: number;
   refund?: Refund;
+  task?: TaskInfo;
+  logReceipts?: LogReceipt[];
 }
 export type PayMethod = 'NEFT' | 'IMPS' | 'RTGS' | 'UPI' | 'CHEQUE' | 'OTHER';
 export const PAY_METHODS: [PayMethod, string][] = [['NEFT', 'NEFT'], ['IMPS', 'IMPS'], ['RTGS', 'RTGS'], ['UPI', 'UPI'], ['CHEQUE', 'Cheque'], ['OTHER', 'Other']];
@@ -133,7 +142,8 @@ export function computeAll(orders: Order[], settlements: Settlement[] = []): Res
     const state: OrderState = yes ? 'fulfilled' : !rf ? 'pending' : rf.reversal ? 'reversed' : 'refunded';
 
     const restOwes = yes ? Math.max(0, net - restPre) : Math.max(0, net + (restF && rf ? refAmt : 0) - (restF ? revAmt : 0));
-    const logOwes = prevLog + (logF && rf ? refAmt : 0);
+    const logRecv = (c.logReceipts ?? []).reduce((a, x) => a + x.amount, 0);
+    const logOwes = Math.max(0, prevLog + (logF && rf ? refAmt : 0) - (logF && rf ? logRecv : 0));
     const tfOwes = Math.max(0, prev.tf - prev.rest) + (logF || tfF ? revAmt : 0);
 
     // Settled TF→restaurant payments clear the owes at the point they were verified (net of what the restaurant owed TF).
@@ -235,7 +245,7 @@ export function toPublic(s: TFState): PublicState {
   return {
     settlements: s.settlements.map(x => ({ ...x, createdBy: '', settledBy: undefined })),
     orders: s.orders.map(o => ({
-      ...o,
+      ...o, task: undefined, logReceipts: undefined,
       refund: o.refund && {
         amount: o.refund.amount, refundId: '', method: 'auto', at: o.refund.at, by: '', creditsDeducted: 0,
         reversal: o.refund.reversal && { amount: o.refund.reversal.amount, reversalId: '', method: 'auto', at: o.refund.reversal.at, by: '' },

@@ -1,9 +1,10 @@
 'use client';
 import { useMemo } from 'react';
-import { Order, OUTCOMES, Outcome, PROVIDERS, Provider, REASONS, Result, defaultReason, money, newOrderId, pct, uid } from '@/lib/calc';
+import { Order, TaskInfo, OUTCOMES, Outcome, PROVIDERS, Provider, REASONS, Result, defaultReason, money, newOrderId, pct, uid } from '@/lib/calc';
 import { NumInput } from './Bits';
 import { useTF } from './TFProvider';
 import { lockedOrderIds } from '@/lib/settlement';
+import { genTask, newTaskId, taskOf } from '@/lib/task';
 
 type Row = { sec: string } | { key: keyof Result; label: string; fmt: (v: any) => string; tone?: 'bad' | 'good' };
 const txt = (v: any) => String(v);
@@ -61,9 +62,11 @@ export default function Simulator() {
   const add = () => setState(s => {
     const p = s.orders[s.orders.length - 1];
     const o: Order = { id: newOrderId(), name: `Order ${s.orders.length + 1}`, restaurant: p?.restaurant ?? 'Restaurant A', provider: p?.provider ?? 'UENGAGE', fc: p?.fc ?? 100, dc: p?.dc ?? 30, pf: p?.pf ?? 0, outcome: 'YES', reason: '', issue: '', createdAt: Date.now() };
+    o.task = genTask(o.provider);
     return { ...s, orders: [...s.orders, o] };
   });
-  const dup = (i: number) => setState(s => { const c = s.orders[i]; const cs = [...s.orders]; cs.splice(i + 1, 0, { ...c, id: newOrderId(), name: c.name + ' copy', refund: undefined, createdAt: Date.now() }); return { ...s, orders: cs }; });
+  const dup = (i: number) => setState(s => { const c = s.orders[i]; const cs = [...s.orders]; cs.splice(i + 1, 0, { ...c, id: newOrderId(), name: c.name + ' copy', refund: undefined, logReceipts: undefined, task: genTask(c.provider), createdAt: Date.now() }); return { ...s, orders: cs }; });
+  const editTask = (i: number, patch: Partial<TaskInfo>) => setState(s => ({ ...s, orders: s.orders.map((c, j) => (j === i ? { ...c, task: { ...taskOf(c), ...patch } } : c)) }));
   const del = (i: number) => setState(s => ({ ...s, orders: s.orders.filter((_, j) => j !== i) }));
   const reset = () => { if (confirm('Delete ALL orders, the refund wallet ledger and the activity log?')) setState({ orders: [], wallet: [], audit: [], settlements: [], accounts: {} }); };
 
@@ -115,7 +118,7 @@ export default function Simulator() {
               <tr className="inp"><th>Order ID</th>{cells(o => <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12 }}>{o.id}</span>, 'n')}</tr>
               <tr className="inp"><th>Restaurant</th>{cells((o, i) => <input type="text" list="rests" value={o.restaurant} disabled={locked(o)} onChange={e => edit(i, { restaurant: e.target.value })} style={{ width: '100%', textAlign: 'right' }} />)}</tr>
               <tr className="inp"><th>Delivery partner</th>{cells((o, i) => (
-                <select value={o.provider} disabled={locked(o)} style={{ width: '100%' }} onChange={e => edit(i, { provider: e.target.value as Provider })}>
+                <select value={o.provider} disabled={locked(o)} style={{ width: '100%' }} onChange={e => { const p = e.target.value as Provider; edit(i, { provider: p, task: { ...taskOf(o), taskId: newTaskId(p) } }); }}>
                   {PROVIDERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>))}</tr>
               {([['fc', 'Food cost / restaurant share'], ['dc', 'Delivery cost'], ['pf', 'Platform fee']] as const).map(([k, l]) => (
@@ -131,6 +134,10 @@ export default function Simulator() {
                 </select>))}</tr>
               <tr className="inp"><th>Issue note (what went wrong)</th>{cells((o, i) => o.outcome === 'YES' ? <span className="sub">—</span> : (
                 <input type="text" value={o.issue} disabled={locked(o)} placeholder="Describe the issue" onChange={e => edit(i, { issue: e.target.value })} style={{ width: '100%' }} />))}</tr>
+              <tr className="sec"><th>Delivery task (demo values, editable)</th>{orders.map(o => <td key={o.id} />)}</tr>
+              {([['taskId', 'Task ID'], ['riderName', 'Rider name'], ['riderPhone', 'Rider phone'], ['pickupAddress', 'Pickup address (restaurant)'], ['pickupPhone', 'Pickup phone'], ['customerName', 'Customer name'], ['customerPhone', 'Customer phone'], ['dropAddress', 'Drop address (customer)']] as const).map(([k, l]) => (
+                <tr className="inp" key={k}><th>{l}</th>{cells((o, i) => <input type="text" value={taskOf(o)[k]} disabled={locked(o)} onChange={e => editTask(i, { [k]: e.target.value })} style={{ width: '100%', minWidth: 190 }} />)}</tr>
+              ))}
               {ROWS.map((r, ri) => 'sec' in r ? (
                 <tr className="sec" key={ri}><th>{r.sec}</th>{orders.map(o => <td key={o.id} />)}</tr>
               ) : (

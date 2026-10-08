@@ -7,6 +7,7 @@ import RefundModal from './RefundModal';
 import { NumInput } from './Bits';
 import { useTF } from './TFProvider';
 import { TFOwesPanel } from './SettleTF';
+import { LogisticsPanel } from './LogisticsPanel';
 import { isOpen } from '@/lib/settlement';
 
 type Panel = null | 'credits' | 'primary' | 'refunds' | 'tfowes' | 'restowes' | 'logowes';
@@ -142,11 +143,8 @@ export default function Operations() {
         </Drawer>
       )}
       {panel === 'logowes' && (
-        <Drawer title="Logistics owe TF" sub="Refunds for logistics-fault orders, tracked separately per delivery partner." onClose={() => setPanel(null)}>
-          <table className="list"><thead><tr><th>Delivery partner</th><th className="r">Owes TF</th></tr></thead><tbody>
-            {summary.logistics.map(x => <tr key={x.provider}><td>{x.label}</td><td className="r" style={{ color: x.owes > 0.005 ? 'var(--bad)' : 'var(--muted)' }}>{money(x.owes)}</td></tr>)}
-            <tr><th>Total</th><th className="r">{money(logTotal)}</th></tr>
-          </tbody></table>
+        <Drawer title="Logistics owe TF" sub="Refunds for logistics-fault orders, tracked separately per delivery partner. Open a partner to see each failed order and record what they paid." onClose={() => setPanel(null)}>
+          <LogisticsPanel />
         </Drawer>
       )}
       {modal && <RefundModal orderId={modal.id} kind={modal.kind} onClose={() => setModal(null)} />}
