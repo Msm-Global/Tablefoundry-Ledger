@@ -140,3 +140,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
 .badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:var(--surface2)}
 .badge.pending{color:var(--warn)}.badge.refunded{color:var(--accent)}.badge.reversed{color:var(--good)}.badge.na{color:var(--muted)}
+button.kpi.click{text-align:left;cursor:pointer;display:block;width:100%;font:inherit;color:inherit}
+button.kpi.click:hover{border-color:var(--accent);background:var(--surface)}
+button.kpi.click .sub{font-size:12px;margin-top:2px}

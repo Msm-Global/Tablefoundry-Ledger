@@ -63,3 +63,10 @@ export function LogoutButton() {
     <button onClick={async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; }}>Sign out</button>
   );
 }
+
+/** Re-renders every `ms` so countdowns and expiry stay current. */
+export function useNow(ms = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  return now;
+}

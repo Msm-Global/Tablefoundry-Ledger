@@ -6,6 +6,8 @@ import { Drawer } from './Drawer';
 import RefundModal from './RefundModal';
 import { NumInput } from './Bits';
 import { useTF } from './TFProvider';
+import { TFOwesPanel } from './SettleTF';
+import { isOpen } from '@/lib/settlement';
 
 type Panel = null | 'credits' | 'primary' | 'refunds' | 'tfowes' | 'restowes' | 'logowes';
 const STATE_BADGE: Record<string, [string, string]> = {
@@ -22,6 +24,7 @@ export default function Operations() {
   const [fState, setFState] = useState('');
   const by = user || 'unknown';
 
+  const openSettle = state.settlements.filter(isOpen).length;
   const pending = state.orders.map((o, i) => ({ o, r: results[i] })).filter(x => x.r.state === 'pending');
   const pendingTotal = pending.reduce((a, x) => a + x.r.tov, 0);
   const tfOwesTotal = summary.restaurants.reduce((a, x) => a + x.tfOwes, 0);
@@ -65,7 +68,7 @@ export default function Operations() {
           <div className="l">Refund requests</div><div className="v">{pending.length}</div><div className="s">{pending.length ? `${money(pendingTotal)} to refund` : 'Nothing pending'}</div>
         </button>
         <button className={`widget ${tfOwesTotal > 0.005 ? 'bad' : ''}`} onClick={() => setPanel('tfowes')}>
-          <div className="l">TF owes restaurants</div><div className="v">{money(tfOwesTotal)}</div><div className="s">{plural(summary.restaurants.filter(x => x.tfOwes > 0.005).length)}</div>
+          <div className="l">TF owes restaurants</div><div className="v">{money(tfOwesTotal)}</div><div className="s">{plural(summary.restaurants.filter(x => x.tfOwes > 0.005).length)}{openSettle ? ` · ${openSettle} settlement${openSettle === 1 ? '' : 's'} in progress` : ''}</div>
         </button>
         <button className={`widget ${restOwesTotal > 0.005 ? 'bad' : ''}`} onClick={() => setPanel('restowes')}>
           <div className="l">Restaurants owe TF</div><div className="v">{money(restOwesTotal)}</div><div className="s">{plural(summary.restaurants.filter(x => x.owes > 0.005).length)}</div>
@@ -125,12 +128,8 @@ export default function Operations() {
         </Drawer>
       )}
       {panel === 'tfowes' && (
-        <Drawer title="TF owes restaurants" sub="Payouts TF owes after failed orders (logistics or TF server faults), per restaurant." onClose={() => setPanel(null)}>
-          <table className="list"><thead><tr><th>Restaurant</th><th className="r">TF owes</th></tr></thead><tbody>
-            {summary.restaurants.length === 0 && <tr><td colSpan={2} className="sub">No restaurants yet</td></tr>}
-            {summary.restaurants.map(x => <tr key={x.key}><td>{x.name}</td><td className="r" style={{ color: x.tfOwes > 0.005 ? 'var(--bad)' : 'var(--muted)' }}>{money(x.tfOwes)}</td></tr>)}
-            <tr><th>Total</th><th className="r">{money(tfOwesTotal)}</th></tr>
-          </tbody></table>
+        <Drawer title="TF owes restaurants" sub="Payouts TF owes after failed orders, per restaurant. Settle a restaurant by paying it outside the app, entering the UTR, and confirming with the OTP it reads out." onClose={() => setPanel(null)}>
+          <TFOwesPanel />
         </Drawer>
       )}
       {panel === 'restowes' && (

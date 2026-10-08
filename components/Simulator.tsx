@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Order, OUTCOMES, Outcome, PROVIDERS, Provider, REASONS, Result, defaultReason, money, newOrderId, pct, uid } from '@/lib/calc';
 import { NumInput } from './Bits';
 import { useTF } from './TFProvider';
+import { lockedOrderIds } from '@/lib/settlement';
 
 type Row = { sec: string } | { key: keyof Result; label: string; fmt: (v: any) => string; tone?: 'bad' | 'good' };
 const txt = (v: any) => String(v);
@@ -64,7 +65,7 @@ export default function Simulator() {
   });
   const dup = (i: number) => setState(s => { const c = s.orders[i]; const cs = [...s.orders]; cs.splice(i + 1, 0, { ...c, id: newOrderId(), name: c.name + ' copy', refund: undefined, createdAt: Date.now() }); return { ...s, orders: cs }; });
   const del = (i: number) => setState(s => ({ ...s, orders: s.orders.filter((_, j) => j !== i) }));
-  const reset = () => { if (confirm('Delete ALL orders, the refund wallet ledger and the activity log?')) setState({ orders: [], wallet: [], audit: [] }); };
+  const reset = () => { if (confirm('Delete ALL orders, the refund wallet ledger and the activity log?')) setState({ orders: [], wallet: [], audit: [], settlements: [] }); };
 
   const downloadCsv = () => {
     const q = (v: unknown) => '"' + String(v).replace(/"/g, '""') + '"';
@@ -78,7 +79,8 @@ export default function Simulator() {
   };
 
   const cells = (render: (o: Order, i: number) => React.ReactNode, cls = '') => orders.map((o, i) => <td key={o.id} className={cls}>{render(o, i)}</td>);
-  const locked = (o: Order) => !!o.refund;
+  const lockedSet = useMemo(() => lockedOrderIds(state), [state]);
+  const locked = (o: Order) => lockedSet.has(o.id);
 
   return (
     <>
@@ -100,9 +102,9 @@ export default function Simulator() {
                 <th>Particulars</th>
                 {orders.map((o, i) => (
                   <th key={o.id}><div className="colhead">
-                    {locked(o) && <span title="Locked: refund recorded">🔒</span>}
+                    {locked(o) && <span title="Locked: a refund or settled payment depends on this order">🔒</span>}
                     <button title="Duplicate" onClick={() => dup(i)}>⧉</button>
-                    <button title={locked(o) ? 'Undo the refund first' : 'Delete'} disabled={locked(o)} onClick={() => del(i)}>✕</button>
+                    <button title={locked(o) ? 'Locked: undo the refund or settlement first' : 'Delete'} disabled={locked(o)} onClick={() => del(i)}>✕</button>
                   </div></th>
                 ))}
               </tr>

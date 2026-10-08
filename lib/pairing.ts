@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { PublicState } from './calc';
+import type { Cmd } from './settlement';
 
 export type Link = 'starting' | 'waiting' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
@@ -10,10 +11,12 @@ export const newCode = () => Array.from({ length: 6 }, () => ALPHABET[Math.floor
 export const normalizeCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
 const peerId = (code: string) => `tfledger-${code}`;
 
-type Msg = { type: 'state'; state: PublicState } | { type: 'ping' };
+type Msg = { type: 'state'; state: PublicState } | { type: 'ping' } | { type: 'cmd'; cmd: Cmd };
 
 /** TF owner side: registers a peer under the pairing code and pushes state to every paired restaurant dashboard. */
-export function useHost(state: PublicState) {
+export function useHost(state: PublicState, onCommand?: (c: Cmd) => void) {
+  const cmdRef = useRef(onCommand);
+  cmdRef.current = onCommand;
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<Link>('starting');
   const [guests, setGuests] = useState(0);
@@ -60,6 +63,7 @@ export function useHost(state: PublicState) {
           setGuests(conns.current.size);
           setStatus(s => (s === 'connected' && conns.current.size === 0 ? 'waiting' : s));
         };
+        conn.on('data', (d: Msg) => { if (d?.type === 'cmd') cmdRef.current?.(d.cmd); });
         conn.on('close', drop);
         conn.on('error', drop);
       });
@@ -88,11 +92,13 @@ export function useGuest(code: string | null) {
   const [state, setState] = useState<PublicState | null>(null);
   const [status, setStatus] = useState<Link>('starting');
   const [message, setMessage] = useState('');
+  const sendRef = useRef<(c: Cmd) => boolean>(() => false);
 
   useEffect(() => {
     if (!code) return;
     let cancelled = false;
     let peer: any, conn: any, timer: any, lastMsg = Date.now();
+    sendRef.current = (cmd: Cmd) => { if (conn?.open) { conn.send({ type: 'cmd', cmd } satisfies Msg); return true; } return false; };
     setStatus('connecting'); setMessage('');
 
     const schedule = (text?: string) => {
@@ -132,5 +138,5 @@ export function useGuest(code: string | null) {
     return () => { cancelled = true; clearTimeout(timer); clearInterval(watchdog); try { conn?.close(); } catch {} peer?.destroy(); };
   }, [code]);
 
-  return { state, status, message };
+  return { state, status, message, send: (c: Cmd) => sendRef.current(c) };
 }

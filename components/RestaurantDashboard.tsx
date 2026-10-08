@@ -4,6 +4,8 @@ import { computeAll, money, restaurantRows } from '@/lib/calc';
 import { normalizeCode, useGuest } from '@/lib/pairing';
 import { LineChart, PairedBars } from './Charts';
 import { StatusChip, ThemeToggle, LogoutButton } from './Bits';
+import RestSettlement from './RestSettlement';
+import { isOpen } from '@/lib/settlement';
 
 const KEY = 'restaurant-pair-code';
 
@@ -44,11 +46,12 @@ export default function RestaurantDashboard() {
 }
 
 function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
-  const { state, status, message } = useGuest(code);
+  const { state, status, message, send } = useGuest(code);
+  const [settleOpen, setSettleOpen] = useState(false);
   const [sel, setSel] = useState('');
   useEffect(() => { try { setSel(sessionStorage.getItem('restaurant-sel') || ''); } catch {} }, []);
 
-  const results = useMemo(() => (state ? computeAll(state.orders) : []), [state]);
+  const results = useMemo(() => (state ? computeAll(state.orders, state.settlements) : []), [state]);
   const allRows = useMemo(() => (state ? restaurantRows(state.orders, results) : []), [state, results]);
   const restaurants = useMemo(() => {
     const m = new Map<string, string>();
@@ -61,6 +64,8 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
   const resFor = useMemo(() => (state ? results.filter((_, i) => allRows[i].key === current) : []), [state, results, allRows, current]);
 
   const sum = (k: 'gateway' | 'splitFee' | 'recovered' | 'payout' | 'held' | 'raised' | 'food') => rows.reduce((a, r) => a + r[k], 0);
+  const mySettlements = useMemo(() => (state ? state.settlements.filter(x => x.restaurantKey === current) : []), [state, current]);
+  const needsAction = mySettlements.some(x => x.status === 'awaiting');
   const last = rows[rows.length - 1];
   const owes = last?.owes ?? 0;
   const tfOwes = last?.tfOwes ?? 0;
@@ -78,7 +83,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
     a.download = 'restaurant-ledger.csv'; a.click();
   };
 
-  const kpis: [string, React.ReactNode, string?][] = [
+  const kpis: [string, React.ReactNode, string?, string?][] = [
     ['Orders', <>{rows.length} <span className="sub">({paid} paid, {rows.length - paid} cancelled)</span></>],
     ['Food value (fulfilled)', money(resFor.filter(r => r.fulfilled === 'YES').reduce((a, r) => a + r.fc, 0))],
     ['Payouts received', money(sum('payout')), 'good'],
@@ -86,7 +91,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
     ['Dues recovered by TF', money(sum('recovered'))],
     ['Refunds pending', String(refundPending), refundPending ? 'bad' : ''],
     ['You owe TF', money(owes), owes > 0.005 ? 'bad' : ''],
-    ['TF owes you', money(tfOwes), tfOwes > 0.005 ? 'good' : ''],
+    ['TF owes you', money(tfOwes), tfOwes > 0.005 ? 'good' : '', 'settle'],
     ['Net position', (net >= 0 ? '+' : '−') + money(Math.abs(net)), net > 0.005 ? 'good' : net < -0.005 ? 'bad' : ''],
   ];
   const z = (v: number) => (v < 0.005 ? ' zero' : '');
@@ -124,7 +129,9 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
             </label>
           </div>
           <div className="kpis">
-            {kpis.map(([l, v, c]) => <div key={l} className={`kpi ${c || ''}`}><div className="l">{l}</div><div className="v">{v}</div></div>)}
+            {kpis.map(([l, v, c, k]) => k === 'settle'
+              ? <button key={l} className={`kpi click ${c || ''}`} onClick={() => setSettleOpen(true)}><div className="l">{l}</div><div className="v">{v}</div><div className="sub" style={needsAction ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{needsAction ? 'Settlement awaiting your verification' : mySettlements.some(isOpen) ? 'Settlement in progress' : 'Click for settlement'}</div></button>
+              : <div key={l} className={`kpi ${c || ''}`}><div className="l">{l}</div><div className="v">{v}</div></div>)}
           </div>
           {rows.length > 0 && (
             <div className="grid2">
@@ -187,6 +194,7 @@ function Paired({ code, onUnpair }: { code: string; onUnpair: () => void }) {
               </table>
             )}
           </div>
+          {settleOpen && <RestSettlement name={restaurants.find(r => r.key === current)?.name ?? ''} settlements={mySettlements} tfOwes={tfOwes} restOwes={owes} send={send} connected={status === 'connected'} onClose={() => setSettleOpen(false)} />}
           <div className="note">Gateway fee is 2% + 18% GST (2.36%) on the order, borne in proportion to food value. Route split fee is 0.25% + 18% GST on the amount transferred to you. If you owe TF, it is recovered from your next fulfilled order&apos;s payout (net of anything TF owes you). Cancelled orders change your balances only after TF processes the refund.</div>
         </>
       )}

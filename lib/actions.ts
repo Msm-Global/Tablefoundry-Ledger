@@ -45,7 +45,7 @@ export function undoReversal(s: TFState, orderId: string, by: string): TFState {
 }
 
 export function metrics(s: TFState) {
-  const res = computeAll(s.orders);
+  const res = computeAll(s.orders, s.settlements);
   return { credits: creditsBalance(s.wallet), primary: primaryBalance(res), sum: summarize(s.orders, res) };
 }
 

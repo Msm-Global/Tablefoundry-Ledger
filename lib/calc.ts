@@ -28,15 +28,34 @@ export interface Order {
   createdAt: number;
   refund?: Refund;
 }
+export type PayMethod = 'NEFT' | 'IMPS' | 'RTGS' | 'UPI' | 'CHEQUE' | 'OTHER';
+export const PAY_METHODS: [PayMethod, string][] = [['NEFT', 'NEFT'], ['IMPS', 'IMPS'], ['RTGS', 'RTGS'], ['UPI', 'UPI'], ['CHEQUE', 'Cheque'], ['OTHER', 'Other']];
+export type SettlementStatus = 'awaiting' | 'otp' | 'settled' | 'cancelled' | 'rejected' | 'undone';
+/** TF pays the restaurant what it owes (net of what the restaurant owes TF); the restaurant confirms with an OTP. */
+export interface Settlement {
+  id: string;
+  restaurantKey: string;
+  restaurant: string;
+  amount: number;      // net amount paid to the restaurant
+  offset: number;      // restaurant-owes-TF netted off in this settlement
+  utr: string;
+  method: PayMethod;
+  status: SettlementStatus;
+  createdAt: number; createdBy: string;
+  verifiedAt?: number;                      // restaurant confirmed receipt
+  otp?: string; otpAt?: number; otpFailed: number; otpIssued: number;
+  settledAt?: number; settledBy?: string; anchorOrderId?: string;
+  closedAt?: number; closedBy?: 'tf' | 'restaurant'; closeReason?: string;
+}
 export interface WalletEntry {
   id: string; ts: number; by: string; note: string; orderId?: string;
   kind: 'topup' | 'refund' | 'refund-undo' | 'adjustment';
   amount: number; // signed
 }
 export interface AuditEntry { id: string; ts: number; by: string; text: string }
-export interface TFState { orders: Order[]; wallet: WalletEntry[]; audit: AuditEntry[] }
-export interface PublicState { orders: Order[] }
-export const BLANK: TFState = { orders: [], wallet: [], audit: [] };
+export interface TFState { orders: Order[]; wallet: WalletEntry[]; audit: AuditEntry[]; settlements: Settlement[] }
+export interface PublicState { orders: Order[]; settlements: Settlement[] }
+export const BLANK: TFState = { orders: [], wallet: [], audit: [], settlements: [] };
 
 export const OUTCOMES: [Outcome, string][] = [
   ['YES', 'Fulfilled'],
@@ -84,7 +103,7 @@ export interface Result {
  * delivery partner (logistics owes). Failed orders only move the owes ledger once the refund
  * (and, for TF/restaurant balances, the transfer reversal) has actually been recorded.
  */
-export function computeAll(orders: Order[]): Result[] {
+export function computeAll(orders: Order[], settlements: Settlement[] = []): Result[] {
   const chain = new Map<string, { rest: number; tf: number }>();
   const logChain = new Map<Provider, number>();
   return orders.map(c => {
@@ -113,7 +132,15 @@ export function computeAll(orders: Order[]): Result[] {
     const logOwes = prevLog + (logF && rf ? refAmt : 0);
     const tfOwes = Math.max(0, prev.tf - prev.rest) + (logF || tfF ? revAmt : 0);
 
-    chain.set(key, { rest: restOwes, tf: tfOwes });
+    // Settled TF→restaurant payments clear the owes at the point they were verified (net of what the restaurant owed TF).
+    let restOwesF = restOwes, tfOwesF = tfOwes;
+    for (const st of settlements) {
+      if (st.status === 'settled' && st.anchorOrderId === c.id) {
+        tfOwesF = Math.max(0, tfOwesF - (st.amount + st.offset));
+        restOwesF = Math.max(0, restOwesF - st.offset);
+      }
+    }
+    chain.set(key, { rest: restOwesF, tf: tfOwesF });
     logChain.set(c.provider, logOwes);
     return {
       prevLog, prevRest: prev.rest, prevTf: prev.tf,
@@ -126,7 +153,7 @@ export function computeAll(orders: Order[]): Result[] {
       fulfilled: yes ? 'YES' : 'NO',
       reason: yes ? '' : c.reason || ({ RESTAURANT: 'Restaurant', LOGISTICS: 'Logistics', TF: 'TF Server' } as const)[o],
       logF, restF, tfF, refund: refAmt, delLeft: delWallet,
-      restOwes, logOwes, tfOwes, state, revAmt,
+      restOwes: restOwesF, logOwes, tfOwes: tfOwesF, state, revAmt,
       transferOut: yes ? restPost : restPre,
     } satisfies Result;
   });
@@ -199,6 +226,7 @@ export const fmtTime = (ts: number) => new Date(ts).toLocaleString('en-IN', { da
 /** What the restaurant dashboard receives: no wallet, no audit trail, no operator identities. */
 export function toPublic(s: TFState): PublicState {
   return {
+    settlements: s.settlements.map(x => ({ ...x, createdBy: '', settledBy: undefined })),
     orders: s.orders.map(o => ({
       ...o,
       refund: o.refund && {
